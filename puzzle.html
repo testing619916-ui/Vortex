@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tech Sparks Puzzle</title>
+  <style>
+    body { text-align: center; font-family: Arial, sans-serif; background: #111; color: white; }
+    canvas { border: 2px solid #f00; margin-top: 20px; cursor: grab; background: white; }
+  </style>
+</head>
+<body>
+  <h1>🧩 Tech Sparks Jigsaw Puzzle</h1>
+  <canvas id="puzzleCanvas" width="600" height="800"></canvas>
+  <p>Drag and drop pieces into place to solve the puzzle!</p>
+
+  <script>
+    const canvas = document.getElementById("puzzleCanvas");
+    const ctx = canvas.getContext("2d");
+    const rows = 3;   // change for more difficulty (e.g., 6, 8)
+    const cols = 3;   // change for more pieces
+    const pieceWidth = canvas.width / cols;
+    const pieceHeight = canvas.height / rows;
+    let pieces = [];
+    let draggingPiece = null;
+    let offsetX, offsetY;
+
+    const img = new Image();
+    img.src = "poster.jpg";  // <<-- your Tech Sparks image here
+    img.onload = initPuzzle;
+
+    function initPuzzle() {
+      pieces = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          let piece = {
+            row: r,
+            col: c,
+            x: Math.random() * (canvas.width - pieceWidth),
+            y: Math.random() * (canvas.height - pieceHeight),
+            correctX: c * pieceWidth,
+            correctY: r * pieceHeight
+          };
+          pieces.push(piece);
+        }
+      }
+      drawPuzzle();
+    }
+
+    function drawPuzzle() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let p of pieces) {
+        ctx.drawImage(
+          img,
+          p.col * (img.width / cols), p.row * (img.height / rows),
+          img.width / cols, img.height / rows,
+          p.x, p.y, pieceWidth, pieceHeight
+        );
+        ctx.strokeStyle = "#000";
+        ctx.strokeRect(p.x, p.y, pieceWidth, pieceHeight);
+      }
+    }
+
+    // Drag & drop
+    canvas.addEventListener("mousedown", e => {
+      const mouseX = e.offsetX, mouseY = e.offsetY;
+      for (let p of pieces) {
+        if (mouseX > p.x && mouseX < p.x + pieceWidth &&
+            mouseY > p.y && mouseY < p.y + pieceHeight) {
+          draggingPiece = p;
+          offsetX = mouseX - p.x;
+          offsetY = mouseY - p.y;
+        }
+      }
+    });
+
+    canvas.addEventListener("mousemove", e => {
+      if (draggingPiece) {
+        draggingPiece.x = e.offsetX - offsetX;
+        draggingPiece.y = e.offsetY - offsetY;
+        drawPuzzle();
+      }
+    });
+
+    canvas.addEventListener("mouseup", () => {
+      if (draggingPiece) {
+        if (Math.abs(draggingPiece.x - draggingPiece.correctX) < 15 &&
+            Math.abs(draggingPiece.y - draggingPiece.correctY) < 15) {
+          draggingPiece.x = draggingPiece.correctX;
+          draggingPiece.y = draggingPiece.correctY;
+        }
+        draggingPiece = null;
+        drawPuzzle();
+        checkSolved();
+      }
+    });
+
+    function checkSolved() {
+      let solved = pieces.every(p =>
+        p.x === p.correctX && p.y === p.correctY
+      );
+      if (solved) {
+        setTimeout(() => alert("🎉 You solved the Tech Sparks Puzzle!"), 100);
+      }
+    }
+  </script>
+</body>
+</html>
