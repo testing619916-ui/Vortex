@@ -4,43 +4,137 @@
   <meta charset="UTF-8">
   <title>Tech Sparks Puzzle</title>
   <style>
-    body { text-align: center; font-family: Arial, sans-serif; background: #111; color: white; }
-    canvas { border: 2px solid #f00; margin-top: 20px; cursor: grab; background: white; }
+    body {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+      margin: 0;
+      overflow: hidden;
+    }
+    #puzzleCanvas {
+      border: 2px solid #f00;
+      margin-top: 20px;
+      background: white;
+      touch-action: none;
+    }
+    #confettiCanvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+    }
+    #congratsPage {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9);
+      color: white;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
+    #congratsPage h1 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      background: #f00;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #c00;
+    }
+    #playerForm {
+      margin-top: 15px;
+    }
+    #playerForm input {
+      padding: 8px;
+      margin: 5px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
   <h1>🧩 Tech Sparks Jigsaw Puzzle</h1>
-  <canvas id="puzzleCanvas" width="600" height="800"></canvas>
-  <p>Drag and drop pieces into place to solve the puzzle!</p>
+
+  <!-- Player form -->
+  <div id="playerForm">
+    <input type="text" id="playerName" placeholder="Enter your Name">
+    <input type="text" id="playerClass" placeholder="Enter your Class">
+    <button onclick="startGame()">Start Game</button>
+  </div>
+
+  <canvas id="puzzleCanvas" width="300" height="400" style="display:none;"></canvas>
+  <p id="instructions" style="display:none;">Drag and drop pieces into place to solve the puzzle!</p>
+
+  <canvas id="confettiCanvas"></canvas>
+
+  <div id="congratsPage">
+    <h1>🎉 Congratulations! 🎉</h1>
+    <button onclick="restartGame()">Play Again</button>
+  </div>
 
   <script>
     const canvas = document.getElementById("puzzleCanvas");
     const ctx = canvas.getContext("2d");
-    const rows = 3;   // change for more difficulty (e.g., 6, 8)
-    const cols = 3;   // change for more pieces
-    const pieceWidth = canvas.width / cols;
-    const pieceHeight = canvas.height / rows;
+    const rows = 3, cols = 3;
+    let pieceWidth, pieceHeight;
     let pieces = [];
     let draggingPiece = null;
     let offsetX, offsetY;
+    let participants = []; // store names & classes
 
     const img = new Image();
-    img.src = "poster.jpg";  // <<-- your Tech Sparks image here
-    img.onload = initPuzzle;
+    img.src = "poster.jpg"; // replace with your event poster
+    img.onload = resizeCanvas;
+
+    function resizeCanvas() {
+      canvas.width = Math.min(window.innerWidth * 0.9, 400);
+      canvas.height = canvas.width * (4/3);
+      pieceWidth = canvas.width / cols;
+      pieceHeight = canvas.height / rows;
+      if (document.getElementById("puzzleCanvas").style.display !== "none") {
+        initPuzzle();
+      }
+    }
+    window.addEventListener("resize", resizeCanvas);
+
+    // Start game after entering name & class
+    function startGame() {
+      const name = document.getElementById("playerName").value.trim();
+      const playerClass = document.getElementById("playerClass").value.trim();
+      if (!name || !playerClass) {
+        alert("Please enter both Name and Class.");
+        return;
+      }
+      participants.push({ name, class: playerClass }); // save participant
+      document.getElementById("playerForm").style.display = "none";
+      canvas.style.display = "block";
+      document.getElementById("instructions").style.display = "block";
+      initPuzzle();
+    }
 
     function initPuzzle() {
       pieces = [];
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          let piece = {
+          pieces.push({
             row: r,
             col: c,
             x: Math.random() * (canvas.width - pieceWidth),
             y: Math.random() * (canvas.height - pieceHeight),
             correctX: c * pieceWidth,
             correctY: r * pieceHeight
-          };
-          pieces.push(piece);
+          });
         }
       }
       drawPuzzle();
@@ -60,28 +154,44 @@
       }
     }
 
-    // Drag & drop
-    canvas.addEventListener("mousedown", e => {
-      const mouseX = e.offsetX, mouseY = e.offsetY;
+    // Drag controls
+    function getPos(e) {
+      if (e.touches) return { x: e.touches[0].clientX - canvas.offsetLeft, y: e.touches[0].clientY - canvas.offsetTop };
+      return { x: e.offsetX, y: e.offsetY };
+    }
+
+    canvas.addEventListener("mousedown", startDrag);
+    canvas.addEventListener("touchstart", startDrag);
+
+    function startDrag(e) {
+      e.preventDefault();
+      const { x, y } = getPos(e);
       for (let p of pieces) {
-        if (mouseX > p.x && mouseX < p.x + pieceWidth &&
-            mouseY > p.y && mouseY < p.y + pieceHeight) {
+        if (x > p.x && x < p.x + pieceWidth &&
+            y > p.y && y < p.y + pieceHeight) {
           draggingPiece = p;
-          offsetX = mouseX - p.x;
-          offsetY = mouseY - p.y;
+          offsetX = x - p.x;
+          offsetY = y - p.y;
         }
       }
-    });
+    }
 
-    canvas.addEventListener("mousemove", e => {
+    canvas.addEventListener("mousemove", drag);
+    canvas.addEventListener("touchmove", drag);
+
+    function drag(e) {
       if (draggingPiece) {
-        draggingPiece.x = e.offsetX - offsetX;
-        draggingPiece.y = e.offsetY - offsetY;
+        const { x, y } = getPos(e);
+        draggingPiece.x = x - offsetX;
+        draggingPiece.y = y - offsetY;
         drawPuzzle();
       }
-    });
+    }
 
-    canvas.addEventListener("mouseup", () => {
+    canvas.addEventListener("mouseup", endDrag);
+    canvas.addEventListener("touchend", endDrag);
+
+    function endDrag() {
       if (draggingPiece) {
         if (Math.abs(draggingPiece.x - draggingPiece.correctX) < 15 &&
             Math.abs(draggingPiece.y - draggingPiece.correctY) < 15) {
@@ -92,16 +202,88 @@
         drawPuzzle();
         checkSolved();
       }
-    });
+    }
 
     function checkSolved() {
-      let solved = pieces.every(p =>
-        p.x === p.correctX && p.y === p.correctY
-      );
+      let solved = pieces.every(p => p.x === p.correctX && p.y === p.correctY);
       if (solved) {
-        setTimeout(() => alert("🎉 You solved the Tech Sparks Puzzle!"), 100);
+        launchConfetti();
+        document.getElementById("congratsPage").style.display = "flex";
       }
+    }
+
+    // 🎉 Confetti
+    const confettiCanvas = document.getElementById("confettiCanvas");
+    const cctx = confettiCanvas.getContext("2d");
+    confettiCanvas.width = window.innerWidth;
+    confettiCanvas.height = window.innerHeight;
+    let confetti = [];
+    let confettiAnimationId = null;
+
+    function launchConfetti() {
+      confetti = [];
+      for (let i = 0; i < 200; i++) {
+        confetti.push({
+          x: Math.random() * confettiCanvas.width,
+          y: Math.random() * confettiCanvas.height - confettiCanvas.height,
+          r: Math.random() * 6 + 2,
+          color: "hsl(" + Math.random() * 360 + ",100%,50%)",
+          speed: Math.random() * 3 + 2
+        });
+      }
+      drawConfetti();
+    }
+
+    function drawConfetti() {
+      cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      confetti.forEach(p => {
+        cctx.beginPath();
+        cctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        cctx.fillStyle = p.color;
+        cctx.fill();
+        p.y += p.speed;
+        if (p.y > confettiCanvas.height) p.y = -10;
+      });
+      confettiAnimationId = requestAnimationFrame(drawConfetti);
+    }
+
+    // Restart
+    function restartGame() {
+      document.getElementById("congratsPage").style.display = "none";
+      if (confettiAnimationId) {
+        cancelAnimationFrame(confettiAnimationId);
+        confettiAnimationId = null;
+      }
+      confetti = [];
+      cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      resizeCanvas();
+    }
+
+    // 🔒 Organizer-only: Export participant list (Ctrl+E / Cmd+E)
+    document.addEventListener("keydown", function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "e") {
+        exportParticipants();
+      }
+    });
+
+    function exportParticipants() {
+      if (participants.length === 0) {
+        alert("No participants yet.");
+        return;
+      }
+      let csvContent = "data:text/csv;charset=utf-8,Name,Class\n";
+      participants.forEach(p => {
+        csvContent += `${p.name},${p.class}\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "participants.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   </script>
 </body>
 </html>
+
